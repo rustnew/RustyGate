@@ -1,0 +1,518 @@
+**la liste complète, bien structurée, bien définie et prête à être suivie** de **toutes les tâches du projet RustyGate avec Actix Web**.
+
+Elle est organisée :
+
+- ✅ **Par phases** (du MVP à la production)
+- ✅ **Par composants** (config, proxy, middlewares, observabilité…)
+- ✅ **Avec livrables concrets** à chaque étape
+- ✅ **Avec dépendances entre tâches**
+- ✅ **Prête à être importée dans un outil de gestion (GitHub Projects, Notion, Trello, etc.)**
+
+---
+
+# 🧩 RustyGate — Toutes les Tâches du Projet (Structurées & Définies)
+
+> Reverse Proxy / API Gateway en Rust avec Actix Web — Haute performance, observable, extensible.
+
+---
+
+## 📁 Structure de Projet (Rappel)
+
+```
+src/
+├── main.rs
+├── server.rs
+├── config.rs
+├── proxy_handler.rs
+├── middleware/
+│   ├── auth.rs
+│   ├── rate_limit.rs
+│   └── cors.rs
+├── balancer/
+│   ├── mod.rs
+│   └── round_robin.rs
+├── health.rs
+├── metrics.rs
+├── tracing.rs
+└── plugins/
+    ├── mod.rs
+    └── manager.rs
+```
+
+---
+
+# 🚧 PHASE 1 — MVP : Serveur + Proxy Basique
+
+> 🎯 Livrable : Un proxy qui route `/api/test` → `http://localhost:8001` et renvoie la réponse.
+
+---
+
+### ✅ TÂCHE 1.1 — Initialiser le projet Rust
+
+- Créer le projet : `cargo new rustygate --bin`
+- Ajouter dépendances de base dans `Cargo.toml` (sans feature `"test"` pour `actix-web`)
+- Créer la structure de dossiers (`src/middleware`, `src/balancer`, etc.)
+
+---
+
+### ✅ TÂCHE 1.2 — Configurer le serveur Actix Web de base
+
+- Dans `src/server.rs` : écrire `start_server()` qui lance un `HttpServer` sur `:8080`
+- Dans `main.rs` : appeler `start_server()`
+- Tester : `curl http://localhost:8080/` → doit renvoyer “RustyGate is running”
+
+---
+
+### ✅ TÂCHE 1.3 — Définir et parser la configuration YAML
+
+- Dans `src/config.rs` :
+  - Définir `struct AppConfig` et `RouteConfig`
+  - Implémenter `load_config(path: &str) -> Result<AppConfig, ConfigError>`
+- Créer `config/default.yaml` avec une route exemple :
+  ```yaml
+  routes:
+    - path: "/api/test"
+      backend: "http://localhost:8001"
+  ```
+
+---
+
+### ✅ TÂCHE 1.4 — Implémenter le handler de proxying
+
+- Dans `src/proxy_handler.rs` :
+  - Écrire `proxy` : handler Actix qui reçoit `HttpRequest` + `web::Data<AppState>`
+  - Extraire le path → matcher avec route
+  - Forwarder vers backend avec `reqwest`
+  - Renvoyer la réponse du backend
+
+---
+
+### ✅ TÂCHE 1.5 — Forward HTTP complet (headers, body, méthode)
+
+- Copier :
+  - Méthode HTTP
+  - Headers (sauf `host`, `content-length`)
+  - Body (streamé si possible)
+- Gérer les erreurs (backend injoignable → 502)
+
+---
+
+### ✅ TÂCHE 1.6 — Ajouter logs structurés de base
+
+- Configurer `tracing-subscriber` pour logs JSON
+- Logger : méthode, path, status, latency
+- Utiliser `tracing-actix-web` pour middleware automatique
+
+---
+
+### ✅ TÂCHE 1.7 — Écrire test d’intégration
+
+- Dans `tests/integration.rs` :
+  - Lancer un backend mock (avec `actix-web::test::start`)
+  - Lancer RustyGate
+  - Appeler `/api/test` → vérifier réponse 200 + body
+
+---
+
+### ✅ TÂCHE 1.8 — Valider le MVP
+
+- ✅ `curl` fonctionne
+- ✅ Logs JSON visibles
+- ✅ Test passe
+- ✅ Aucune fuite mémoire (test manuel avec `htop`)
+
+---
+
+# 🧱 PHASE 2 — Middlewares & Observabilité Basique
+
+> 🎯 Livrable : Auth JWT, rate limiting, métriques Prometheus, logs enrichis.
+
+---
+
+### ✅ TÂCHE 2.1 — Implémenter middleware JWT (Auth)
+
+- Dans `src/middleware/auth.rs` :
+  - Créer `JwtAuth` comme `actix_web::middleware::Middleware`
+  - Vérifier header `Authorization: Bearer <token>`
+  - Config : activer/désactiver par route
+  - Retourner 401 si invalide
+
+---
+
+### ✅ TÂCHE 2.2 — Implémenter middleware Rate Limiting
+
+- Dans `src/middleware/rate_limit.rs` :
+  - Utiliser `HashMap<IpAddr, (Instant, usize)>`
+  - Limite : 100 req/min par IP
+  - Retourner 429 si dépassé
+  - Configurable dans `config.yaml`
+
+---
+
+### ✅ TÂCHE 2.3 — Implémenter middleware CORS
+
+- Dans `src/middleware/cors.rs` :
+  - Ajouter headers `Access-Control-Allow-*`
+  - Config : `allow_origins`, `allow_methods`
+
+---
+
+### ✅ TÂCHE 2.4 — Exposer métriques Prometheus
+
+- Dans `src/metrics.rs` :
+  - Initialiser `metrics_exporter_prometheus`
+  - Exposer `/metrics` sur `:8081`
+  - Définir :
+    - `requests_total`
+    - `request_duration_seconds`
+    - `backend_failures_total`
+
+---
+
+### ✅ TÂCHE 2.5 — Intégrer métriques dans le handler
+
+- Dans `proxy_handler.rs` :
+  - Incrémenter `requests_total` par status/route
+  - Mesurer la latence avec `Histogram::start_timer()`
+
+---
+
+### ✅ TÂCHE 2.6 — Tester middlewares
+
+- Test JWT : sans token → 401
+- Test rate limit : 101 req en 60s → 429
+- Test métriques : `curl localhost:8081/metrics` → compteurs visibles
+
+---
+
+### ✅ TÂCHE 2.7 — Documenter configuration middlewares
+
+- Mettre à jour `README.md` avec exemples de config :
+  ```yaml
+  middlewares:
+    - name: jwt
+      enabled: true
+    - name: rate_limit
+      limit: 100
+      window: 60
+  ```
+
+---
+
+# ⚖️ PHASE 3 — Load Balancing & Résilience
+
+> 🎯 Livrable : Plusieurs backends, health checks, retry, timeout.
+
+---
+
+### ✅ TÂCHE 3.1 — Implémenter RoundRobin Load Balancer
+
+- Dans `src/balancer/round_robin.rs` :
+  - Struct `RoundRobin` avec `Vec<Backend>` + `AtomicUsize`
+  - Méthode `select()` → retourne backend suivant
+
+---
+
+### ✅ TÂCHE 3.2 — Implémenter LeastConnections (optionnel)
+
+- Même structure, mais compte connexions actives
+- Utile pour backends hétérogènes
+
+---
+
+### ✅ TÂCHE 3.3 — Implémenter Health Checker
+
+- Dans `src/health.rs` :
+  - Tâche périodique (`tokio::spawn`) qui ping `/health` sur chaque backend
+  - Met à jour `is_healthy: AtomicBool`
+  - Ignore les backends unhealthy dans `select()`
+
+---
+
+### ✅ TÂCHE 3.4 — Ajouter timeout & retry
+
+- Dans `proxy_handler.rs` :
+  - Timeout configurable (ex: 5s) → `reqwest` timeout
+  - Si timeout/erreur → retry sur autre backend (max 2 fois)
+  - Logger les retries
+
+---
+
+### ✅ TÂCHE 3.5 — Tester résilience
+
+- Démarrer 2 backends → arrêter l’un → vérifier qu’il est retiré
+- Simuler timeout → vérifier retry
+- Vérifier métrique `backend_failures_total`
+
+---
+
+### ✅ TÂCHE 3.6 — Mettre à jour config pour multi-backends
+
+```yaml
+routes:
+  - path: "/api/users"
+    backends:
+      - url: "http://users1:8001"
+      - url: "http://users2:8001"
+    strategy: "round_robin"
+```
+
+---
+
+# 🔍 PHASE 4 — Observabilité Avancée (Tracing)
+
+> 🎯 Livrable : Traces distribuées dans Jaeger, propagation de contexte.
+
+---
+
+### ✅ TÂCHE 4.1 — Configurer OpenTelemetry
+
+- Dans `src/tracing.rs` :
+  - Initialiser `OtlpTracePipeline`
+  - Exporter vers Jaeger (localhost:4317)
+  - Installer `tracing_opentelemetry::layer()`
+
+---
+
+### ✅ TÂCHE 4.2 — Propager le contexte de tracing
+
+- Extraire `traceparent` des headers entrants
+- Injecter dans les requêtes sortantes (vers backend)
+- Utiliser `opentelemetry::global::get_text_map_propagator().inject()`
+
+---
+
+### ✅ TÂCHE 4.3 — Créer des spans dans le handler
+
+- Span “proxy_request” autour du forward
+- Attributs : route, backend, status, duration
+- Lier au parent (requête entrante)
+
+---
+
+### ✅ TÂCHE 4.4 — Lancer Jaeger localement
+
+```bash
+docker run -d -p 16686:16686 -p 6831:6831/udp jaegertracing/all-in-one
+```
+
+---
+
+### ✅ TÂCHE 4.5 — Tester tracing
+
+- Appeler l’API → vérifier trace dans Jaeger UI
+- Vérifier que `trace_id` dans les logs match la trace
+
+---
+
+### ✅ TÂCHE 4.6 — Documenter setup observabilité
+
+- Fournir `docker-compose.observability.yml`
+- Expliquer comment configurer Prometheus + Grafana + Jaeger
+
+---
+
+# 🔄 PHASE 5 — Reload à Chaud & Graceful Shutdown
+
+> 🎯 Livrable : Reload config sans redémarrer, shutdown propre.
+
+---
+
+### ✅ TÂCHE 5.1 — Surveiller les changements de fichier config
+
+- Dans `src/config.rs` :
+  - Utiliser `notify::recommended_watcher`
+  - Canal `mpsc` pour envoyer événement de reload
+
+---
+
+### ✅ TÂCHE 5.2 — Recharger la config dynamiquement
+
+- Stocker `AppConfig` dans `Arc<RwLock<AppState>>`
+- Mettre à jour l’état sans bloquer les requêtes
+- Logger “Config reloaded”
+
+---
+
+### ✅ TÂCHE 5.3 — Ajouter endpoint `/admin/reload`
+
+- Route POST `/admin/reload`
+- Protégée par token (configurable)
+- Force reload même sans changement de fichier
+
+---
+
+### ✅ TÂCHE 5.4 — Implémenter graceful shutdown
+
+- Capturer `SIGINT` / `SIGTERM`
+- Arrêter d’accepter les nouvelles connexions
+- Attendre requêtes en cours (timeout 30s)
+- Libérer ressources
+
+---
+
+### ✅ TÂCHE 5.5 — Tester reload & shutdown
+
+- Modifier `config.yaml` → vérifier reload → nouvelle route fonctionne
+- `Ctrl+C` → vérifier logs “shutting down gracefully”
+
+---
+
+# 🧩 PHASE 6 — Plugins WASM (Extensibilité)
+
+> 🎯 Livrable : Plugins en WASM chargés à chaud, transformant requêtes.
+
+---
+
+### ✅ TÂCHE 6.1 — Configurer support WASM (feature flag)
+
+- Dans `Cargo.toml` : feature `wasm` avec `wasmer`
+- Dans `src/plugins/mod.rs` : trait `Plugin`
+
+---
+
+### ✅ TÂCHE 6.2 — Définir interface plugin standard
+
+```rust
+pub trait Plugin {
+    fn on_request(&mut self, req: &mut Request) -> Result<(), PluginError>;
+    fn on_response(&mut self, res: &mut Response) -> Result<(), PluginError>;
+}
+```
+
+---
+
+### ✅ TÂCHE 6.3 — Charger et exécuter plugin .wasm
+
+- Dans `src/plugins/manager.rs` :
+  - Lire fichier `.wasm`
+  - Compiler avec `wasmer`
+  - Instancier → appeler `on_request`
+
+---
+
+### ✅ TÂCHE 6.4 — Plugin d’exemple : ajouter header
+
+- Écrire plugin en Rust → compiler en WASM
+- Ajoute header `X-RustyGate-Plugin: executed`
+
+---
+
+### ✅ TÂCHE 6.5 — Hot reload des plugins
+
+- Surveiller dossier `./plugins/`
+- Recharger si nouveau fichier détecté
+
+---
+
+### ✅ TÂCHE 6.6 — Tests plugins
+
+- Déposer plugin → appeler API → vérifier header ajouté
+- Modifier plugin → reload → vérifier nouveau comportement
+
+---
+
+# 🚀 PHASE 7 — Production Ready
+
+> 🎯 Livrable : Binaire optimisé, doc complète, CI/CD, Helm chart.
+
+---
+
+### ✅ TÂCHE 7.1 — Build optimisé (stripping, musl)
+
+```bash
+cargo build --release --target x86_64-unknown-linux-musl
+strip target/.../rustygate
+```
+
+---
+
+### ✅ TÂCHE 7.2 — Dockerfile multi-stage
+
+```dockerfile
+FROM rust:1.78 AS builder
+...
+FROM alpine:latest
+COPY --from=builder ...
+```
+
+---
+
+### ✅ TÂCHE 7.3 — CI/CD GitHub Actions
+
+- Workflow : build, test, release binaire Linux/macOS/Windows
+- Publier release sur GitHub
+
+---
+
+### ✅ TÂCHE 7.4 — Documentation complète
+
+- Architecture
+- Configuration
+- Déploiement
+- Plugins
+- Observabilité
+- FAQ / Troubleshooting
+
+---
+
+### ✅ TÂCHE 7.5 — Helm Chart (optionnel)
+
+- Pour déployer sur Kubernetes
+- Configurable via `values.yaml`
+
+---
+
+### ✅ TÂCHE 7.6 — Benchmarking final
+
+- `wrk -t4 -c100 -d30s http://localhost:8080/api/test`
+- Objectif : > 10k req/s, latency < 5ms
+
+---
+
+### ✅ TÂCHE 7.7 — Sécurité avancée (optionnel)
+
+- mTLS entre proxy et backends
+- WAF basique (regex sur headers/body)
+- HTTP/3 (QUIC) avec `quinn` ou `h3`
+
+---
+
+## ✅ CHECKLIST GÉNÉRALE — À COCHER
+
+| Phase | Tâche clé | ✅ |
+|-------|-----------|----|
+| 1 | Serveur + proxy basique fonctionnel | ☐ |
+| 1 | Test d’intégration passe | ☐ |
+| 2 | JWT + Rate Limit + CORS | ☐ |
+| 2 | Métriques Prometheus exposées | ☐ |
+| 3 | Load balancing + health checks | ☐ |
+| 3 | Timeout + retry fonctionnels | ☐ |
+| 4 | Traces visibles dans Jaeger | ☐ |
+| 5 | Reload config à chaud | ☐ |
+| 5 | Graceful shutdown | ☐ |
+| 6 | Plugin WASM exécuté | ☐ |
+| 7 | Binaire statique + Docker | ☐ |
+| 7 | CI/CD + doc complète | ☐ |
+
+---
+
+## 🗂️ Fichiers à créer / modifier — Checklist
+
+| Fichier | Statut | ✅ |
+|---------|--------|----|
+| `Cargo.toml` | Dépendances complètes | ☐ |
+| `src/main.rs` | Lance serveur | ☐ |
+| `src/server.rs` | Setup Actix | ☐ |
+| `src/config.rs` | Parsing + reload | ☐ |
+| `src/proxy_handler.rs` | Logique de proxy | ☐ |
+| `src/middleware/` | Auth, rate limit, CORS | ☐ |
+| `src/balancer/` | RoundRobin, LeastConn | ☐ |
+| `src/health.rs` | Health checks | ☐ |
+| `src/metrics.rs` | Prometheus | ☐ |
+| `src/tracing.rs` | OpenTelemetry | ☐ |
+| `src/plugins/` | Gestion WASM | ☐ |
+| `tests/integration.rs` | Tests bout en bout | ☐ |
+| `README.md` | Documentation complète | ☐ |
+| `Dockerfile` | Build prod | ☐ |
+| `.github/workflows/ci.yml` | CI/CD | ☐ |
