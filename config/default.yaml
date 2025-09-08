@@ -1,0 +1,5 @@
+routes:
+  - path: "/api/test"
+    backend: "http://localhost:8001"
+  - path: "/api/users"
+    backend: "http://localhost:8002"

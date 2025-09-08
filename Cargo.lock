@@ -3,38 +3,6 @@
 version = 4
 
 [[package]]
-name = "RustyGate"
-version = "0.1.0"
-dependencies = [
- "actix-http",
- "actix-rt",
- "actix-web",
- "anyhow",
- "clap",
- "config",
- "criterion",
- "futures",
- "metrics",
- "metrics-exporter-prometheus",
- "notify",
- "opentelemetry 0.20.0",
- "opentelemetry-otlp",
- "rand 0.8.5",
- "reqwest",
- "serde",
- "serde_yaml",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "tokio-util",
- "tracing",
- "tracing-actix-web",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "wasmer",
-]
-
-[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2903,6 +2871,38 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "rustygate"
+version = "0.1.0"
+dependencies = [
+ "actix-http",
+ "actix-rt",
+ "actix-web",
+ "anyhow",
+ "clap",
+ "config",
+ "criterion",
+ "futures",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "notify",
+ "opentelemetry 0.20.0",
+ "opentelemetry-otlp",
+ "rand 0.8.5",
+ "reqwest",
+ "serde",
+ "serde_yaml",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tokio-util",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "wasmer",
+]
 
 [[package]]
 name = "ryu"

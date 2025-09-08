@@ -1,17 +1,33 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+// src/main.rs
+pub mod config;
+pub mod server;
+pub mod proxy_handler;
 
-pub async fn health_check() -> impl Responder {
-    HttpResponse::Ok().body("RustyGate is running 🚀")
-}
-
+use tracing_subscriber;
+use std::sync::Arc;
 
 #[actix_web::main]
-async fn main() -> Result<()> {
-    HttpServer::new(|| {
-        App::new()
-            .route("/", web::get().to(health_check()))  
-    })
-    .bind("0.0.0.8080")?
-    .run()
-    .await
+async fn main() -> std::io::Result<()> {
+    // Initialiser tracing
+    tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .json() // Logs en JSON
+        .init();
+
+    // Charger la configuration
+    let config_path = "config/default.yaml";
+    let config = match config::AppConfig::load_from_file(config_path) {
+        Ok(cfg) => {
+            println!("✅ Configuration chargée depuis {}", config_path);
+            Arc::new(cfg)
+        }
+        Err(e) => {
+            eprintln!("❌ Erreur de chargement de la config: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Lancer le serveur
+    println!("🚀 RustyGate démarré sur http://localhost:8080");
+    server::start_server(config).await
 }

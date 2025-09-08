@@ -1,5 +1,5 @@
 [package]
-name = "RustyGate"
+name = "rustygate"
 version = "0.1.0"
 edition = "2024"
 
@@ -66,3 +66,7 @@ criterion = "0.5"
 [[bench]]
 name = "proxy_bench"
 harness = false
+
+[[test]]
+name = "integration"
+path = "tests/integrations.rs"
